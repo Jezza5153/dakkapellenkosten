@@ -1,18 +1,19 @@
 /**
- * Root page — redirects to the public site or dashboard
+ * Homepage — DakkapellenKosten.nl
+ * Premium lead-generation landing page
  */
 
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import Link from "next/link";
+import HomeClient from "./home-client";
 
-export default async function HomePage() {
-    const session = await auth();
+export const metadata: Metadata = {
+    title: "Dakkapel offertes vergelijken in 2026 | Gratis & vrijblijvend",
+    description:
+        "Vergelijk gratis dakkapel offertes van betrouwbare specialisten. Ontvang binnen 48 uur tot 4 vrijblijvende offertes en bespaar tot 35% op je dakkapel.",
+    alternates: { canonical: "https://dakkapellenkosten.nl/" },
+};
 
-    if (session?.user) {
-        redirect("/dashboard");
-    }
-
-    // For non-logged-in users, show a simple redirect to the static site
-    // The static index.html is served at /index.html 
-    redirect("/index.html");
+export default function HomePage() {
+    return <HomeClient />;
 }
