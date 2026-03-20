@@ -1,0 +1,18 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#F7F9FC"/>
+  <rect x="52" y="52" width="1096" height="526" rx="28" fill="#16324F"/>
+  <rect x="108" y="118" width="206" height="42" rx="21" fill="#F59E0B"/>
+  <text x="139" y="145" fill="#16324F" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">2026 SEO</text>
+  <text x="108" y="252" fill="white" font-family="Inter, Arial, sans-serif" font-size="68" font-weight="800">DakkapellenKosten.nl</text>
+  <text x="108" y="328" fill="#E0ECF8" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="500">Dakkapel kosten vergelijken, artikelen en gratis offertes</text>
+  <text x="108" y="390" fill="#E0ECF8" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="400">Prijzen, materialen, vergunningen en bespaartips voor huiseigenaren.</text>
+  <rect x="108" y="456" width="340" height="64" rx="18" fill="#24507A"/>
+  <text x="142" y="497" fill="white" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">Gratis offertes vergelijken</text>
+  <path d="M925 169L1015 245H835L925 169Z" fill="#F59E0B"/>
+  <rect x="852" y="244" width="146" height="128" rx="20" fill="#E0ECF8"/>
+  <rect x="875" y="270" width="100" height="20" rx="10" fill="#24507A"/>
+  <rect x="875" y="307" width="78" height="16" rx="8" fill="#8AA5C0"/>
+  <rect x="875" y="337" width="58" height="16" rx="8" fill="#8AA5C0"/>
+  <circle cx="915" cy="441" r="44" fill="#F59E0B"/>
+  <path d="M896 440L909 453L936 426" stroke="#16324F" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
