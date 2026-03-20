@@ -2,6 +2,8 @@
  * Dynamic Sitemap — Generates sitemap.xml from database
  */
 
+export const dynamic = "force-dynamic";
+
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import type { MetadataRoute } from "next";

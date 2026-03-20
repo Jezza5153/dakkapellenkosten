@@ -3,6 +3,8 @@
  * Renders articles from CMS database
  */
 
+export const dynamic = "force-dynamic";
+
 import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
