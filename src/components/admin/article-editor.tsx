@@ -317,8 +317,9 @@ export default function ArticleEditor({ isNew = false }: { isNew?: boolean }) {
                 <div className="flex items-center gap-2">
                     {/* Last saved */}
                     {lastSaved && (
-                        <span className="text-[10px] text-gray-500 hidden sm:block">
-                            Opgeslagen {lastSaved.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
+                        <span className="text-[10px] text-gray-500 hidden sm:flex items-center gap-1">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg>
+                            {lastSaved.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
                         </span>
                     )}
                     {/* Preview */}
@@ -327,24 +328,27 @@ export default function ArticleEditor({ isNew = false }: { isNew?: boolean }) {
                             href={`/kenniscentrum/${data.slug}`}
                             target="_blank"
                             rel="noopener"
-                            className="px-3 py-2 bg-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-600 transition-colors hidden sm:inline-flex items-center gap-1"
+                            className="px-3 py-2 bg-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-600 transition-colors hidden sm:inline-flex items-center gap-1.5"
                         >
-                            👁 Preview
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            Preview
                         </a>
                     )}
                     <button
                         onClick={() => handleSave("draft")}
                         disabled={saving || !data.title}
-                        className="px-4 py-2 bg-gray-700 text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                        className="px-4 py-2 bg-gray-700 text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center gap-1.5"
                     >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                         {saving ? "..." : "Concept"}
                     </button>
                     <button
                         onClick={() => handleSave("published")}
                         disabled={saving || !data.title}
-                        className="px-4 py-2 bg-amber-500 text-gray-900 rounded-lg text-sm font-semibold hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                        className="px-4 py-2 bg-amber-500 text-gray-900 rounded-lg text-sm font-semibold hover:bg-amber-400 disabled:opacity-50 transition-colors flex items-center gap-1.5"
                     >
-                        {saving ? "..." : "Publiceren"}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        {saving ? "..." : data.status === "published" ? "Bijwerken" : "Publiceren"}
                     </button>
                 </div>
             </div>
@@ -406,34 +410,66 @@ export default function ArticleEditor({ isNew = false }: { isNew?: boolean }) {
 
                 {/* Sidebar */}
                 <div className="space-y-4">
-                    {/* Status + Scheduled Publishing */}
-                    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-                        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Status</h3>
-                        <select
-                            value={data.status}
-                            onChange={e => updateField("status", e.target.value)}
-                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white outline-none cursor-pointer"
-                        >
-                            <option value="draft">Concept</option>
-                            <option value="published">Gepubliceerd</option>
-                            <option value="scheduled">Ingepland</option>
-                        </select>
-                        {data.status === "scheduled" && (
-                            <div className="mt-3">
-                                <label className="text-xs text-gray-500 block mb-1">Publicatiedatum</label>
-                                <input
-                                    type="datetime-local"
-                                    value={data.publishAt}
-                                    onChange={e => updateField("publishAt", e.target.value)}
-                                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white outline-none focus:border-amber-400 [color-scheme:dark]"
-                                />
-                                {data.publishAt && (
-                                    <div className="text-[10px] text-gray-500 mt-1">
-                                        Wordt gepubliceerd op {new Date(data.publishAt).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
-                                    </div>
-                                )}
+                    {/* Publish Panel — WordPress style */}
+                    <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Publiceren</h3>
+                            <div className={`w-2.5 h-2.5 rounded-full ${data.status === 'published' ? 'bg-emerald-400' : data.status === 'scheduled' ? 'bg-blue-400' : 'bg-gray-500'}`} />
+                        </div>
+                        <div className="p-4 space-y-3">
+                            {/* Status row */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-500">Status</span>
+                                <select
+                                    value={data.status}
+                                    onChange={e => updateField("status", e.target.value)}
+                                    className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-xs text-white outline-none cursor-pointer"
+                                >
+                                    <option value="draft">Concept</option>
+                                    <option value="published">Gepubliceerd</option>
+                                    <option value="scheduled">Ingepland</option>
+                                </select>
                             </div>
-                        )}
+                            {/* Visibility */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-500">Zichtbaarheid</span>
+                                <span className="text-xs text-gray-300">Openbaar</span>
+                            </div>
+                            {/* Schedule */}
+                            {data.status === "scheduled" && (
+                                <div>
+                                    <label className="text-xs text-gray-500 block mb-1">Publicatiedatum</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={data.publishAt}
+                                        onChange={e => updateField("publishAt", e.target.value)}
+                                        className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-xs text-white outline-none focus:border-amber-400 [color-scheme:dark]"
+                                    />
+                                    {data.publishAt && (
+                                        <div className="text-[10px] text-amber-400/80 mt-1">
+                                            ⏰ {new Date(data.publishAt).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        {/* Action buttons inside panel */}
+                        <div className="px-4 py-3 border-t border-gray-700 bg-gray-800/50 flex items-center justify-between">
+                            <button
+                                onClick={() => handleSave("draft")}
+                                disabled={saving || !data.title}
+                                className="text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                            >
+                                Bewaar concept
+                            </button>
+                            <button
+                                onClick={() => handleSave("published")}
+                                disabled={saving || !data.title}
+                                className="px-3 py-1.5 bg-amber-500 text-gray-900 rounded text-xs font-semibold hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                            >
+                                {data.status === "published" ? "Bijwerken" : "Publiceren"}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Category — Dropdown instead of free text */}
@@ -460,17 +496,25 @@ export default function ArticleEditor({ isNew = false }: { isNew?: boolean }) {
                     </div>
 
                     {/* SEO Settings — Always visible */}
-                    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-                        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                            SEO Instellingen
+                    <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">SEO</h3>
                             {data.seoTitle && data.seoDescription ? (
-                                <span className="text-emerald-400 ml-2">✓</span>
+                                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded-full">✓ Compleet</span>
                             ) : (
-                                <span className="text-yellow-400 ml-2">⚠</span>
+                                <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded-full">⚠ Onvolledig</span>
                             )}
-                        </h3>
+                        </div>
 
-                        <div className="space-y-3">
+                        {/* Google Snippet Preview */}
+                        <div className="px-4 py-3 bg-gray-900/50 border-b border-gray-700">
+                            <div className="text-[10px] text-gray-500 mb-1.5">Google preview</div>
+                            <div className="text-sm text-blue-400 font-medium truncate">{data.seoTitle || data.title || "Artikel titel"}</div>
+                            <div className="text-[11px] text-emerald-400 truncate">dakkapellenkosten.nl/kenniscentrum/{data.slug || "..."}</div>
+                            <div className="text-[11px] text-gray-400 line-clamp-2 mt-0.5">{data.seoDescription || "Voeg een meta beschrijving toe..."}</div>
+                        </div>
+
+                        <div className="p-4 space-y-3">
                             <div>
                                 <label className="text-xs text-gray-500 mb-1 block">SEO Titel</label>
                                 <input
