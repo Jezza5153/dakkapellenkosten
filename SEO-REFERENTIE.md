@@ -1,6 +1,6 @@
 # DakkapellenKosten.nl — SEO & Content Referentie
 
-**Gegenereerd:** 21 maart 2026 om 11:17
+**Gegenereerd:** 21 maart 2026 om 11:34
 **Live URL:** https://dakkapellenkosten.vercel.app
 **Productie URL:** https://dakkapellenkosten.nl (DNS nog niet actief)
 

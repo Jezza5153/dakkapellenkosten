@@ -7,13 +7,13 @@ import type { Metadata } from "next";
 import HomeClient from "./home-client";
 
 export const metadata: Metadata = {
-    title: "Dakkapel offertes vergelijken in 2026 | Gratis & vrijblijvend",
+    title: "Dakkapel offertes vergelijken in 2026 | Gratis offertes aanvragen",
     description:
-        "Vergelijk gratis dakkapel offertes van betrouwbare specialisten. Ontvang binnen 48 uur tot 4 vrijblijvende offertes en bespaar tot 35% op je dakkapel.",
+        "Vergelijk gratis dakkapel offertes van specialisten in jouw regio. Ontvang binnen 48 uur tot 4 vrijblijvende offertes en vergelijk prijs, materiaal en uitvoering.",
     alternates: { canonical: "https://dakkapellenkosten.nl/" },
     openGraph: {
-        title: "Dakkapel offertes vergelijken in 2026 | Gratis & vrijblijvend",
-        description: "Vergelijk gratis dakkapel offertes van betrouwbare specialisten. Ontvang binnen 48 uur tot 4 vrijblijvende offertes en bespaar tot 35%.",
+        title: "Dakkapel offertes vergelijken in 2026 | Gratis offertes aanvragen",
+        description: "Vergelijk gratis dakkapel offertes van specialisten in jouw regio. Ontvang binnen 48 uur tot 4 vrijblijvende offertes en vergelijk prijs, materiaal en uitvoering.",
         url: "https://dakkapellenkosten.nl/",
         type: "website",
         locale: "nl_NL",
@@ -21,8 +21,8 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: "summary_large_image",
-        title: "Dakkapel offertes vergelijken in 2026 | Gratis & vrijblijvend",
-        description: "Vergelijk gratis dakkapel offertes van betrouwbare specialisten. Bespaar tot 35%.",
+        title: "Dakkapel offertes vergelijken in 2026 | Gratis offertes aanvragen",
+        description: "Vergelijk gratis dakkapel offertes van specialisten in jouw regio. Bespaar door offertes te vergelijken.",
     },
 };
 

@@ -1,6 +1,7 @@
 /**
  * Dynamic Blog Route — /kenniscentrum/[slug]
  * Renders articles from CMS database with full SEO (OG, Twitter, JSON-LD)
+ * Includes related articles block and CTA per SEO master brief
  */
 
 export const dynamic = "force-dynamic";
@@ -17,40 +18,18 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     const { slug } = await params;
-
     const article = await db.query.articles.findFirst({
-        where: and(
-            eq(schema.articles.slug, slug),
-            eq(schema.articles.status, "published")
-        ),
+        where: and(eq(schema.articles.slug, slug), eq(schema.articles.status, "published")),
     });
-
     if (!article) return {};
-
     const title = article.seoTitle || article.title;
     const description = article.seoDescription || article.excerpt || undefined;
     const canonical = article.canonicalUrl || `https://dakkapellenkosten.nl/kenniscentrum/${article.slug}`;
-
     return {
-        title,
-        description,
+        title, description,
         alternates: { canonical },
-        openGraph: {
-            title,
-            description,
-            url: canonical,
-            type: "article",
-            locale: "nl_NL",
-            siteName: "DakkapellenKosten.nl",
-            publishedTime: article.publishedAt?.toISOString(),
-            modifiedTime: article.updatedAt?.toISOString(),
-            section: article.category || undefined,
-        },
-        twitter: {
-            card: "summary_large_image",
-            title,
-            description,
-        },
+        openGraph: { title, description, url: canonical, type: "article", locale: "nl_NL", siteName: "DakkapellenKosten.nl", publishedTime: article.publishedAt?.toISOString(), modifiedTime: article.updatedAt?.toISOString(), section: article.category || undefined },
+        twitter: { card: "summary_large_image", title, description },
     };
 }
 
@@ -58,29 +37,33 @@ export default async function ArticlePage({ params }: PageProps) {
     const { slug } = await params;
 
     const article = await db.query.articles.findFirst({
-        where: and(
-            eq(schema.articles.slug, slug),
-            eq(schema.articles.status, "published")
-        ),
+        where: and(eq(schema.articles.slug, slug), eq(schema.articles.status, "published")),
         with: { author: { columns: { name: true } } },
     });
-
     if (!article) notFound();
 
-    const canonical = article.canonicalUrl || `https://dakkapellenkosten.nl/kenniscentrum/${article.slug}`;
+    // Related articles (same category, exclude self)
+    let related: any[] = [];
+    if (article.category) {
+        try {
+            const all = await db.query.articles.findMany({
+                where: and(eq(schema.articles.status, "published"), eq(schema.articles.category, article.category)),
+                columns: { id: true, title: true, slug: true, category: true },
+                limit: 5,
+            });
+            related = all.filter(a => a.slug !== slug).slice(0, 4);
+        } catch { /* ignore */ }
+    }
 
+    const canonical = article.canonicalUrl || `https://dakkapellenkosten.nl/kenniscentrum/${article.slug}`;
     const jsonLd = [
         {
-            "@context": "https://schema.org",
-            "@type": "BlogPosting",
+            "@context": "https://schema.org", "@type": "BlogPosting",
             headline: article.title,
             description: article.seoDescription || article.excerpt || "",
             datePublished: article.publishedAt?.toISOString(),
             dateModified: article.updatedAt?.toISOString(),
-            author: {
-                "@type": "Person",
-                name: article.author?.name || "DakkapellenKosten.nl",
-            },
+            author: { "@type": "Person", name: article.author?.name || "DakkapellenKosten.nl" },
             publisher: { "@id": "https://dakkapellenkosten.nl/#organization" },
             mainEntityOfPage: canonical,
             articleSection: article.category || undefined,
@@ -88,8 +71,7 @@ export default async function ArticlePage({ params }: PageProps) {
             isAccessibleForFree: true,
         },
         {
-            "@context": "https://schema.org",
-            "@type": "BreadcrumbList",
+            "@context": "https://schema.org", "@type": "BreadcrumbList",
             itemListElement: [
                 { "@type": "ListItem", position: 1, name: "Home", item: "https://dakkapellenkosten.nl/" },
                 { "@type": "ListItem", position: 2, name: "Kenniscentrum", item: "https://dakkapellenkosten.nl/kenniscentrum/" },
@@ -147,27 +129,33 @@ export default async function ArticlePage({ params }: PageProps) {
                         <div style={{ display: "flex", gap: 16, fontSize: 13, color: "#9CA3AF" }}>
                             {article.author?.name && <span>Door {article.author.name}</span>}
                             {article.publishedAt && (
-                                <span>
-                                    {new Date(article.publishedAt).toLocaleDateString("nl-NL", {
-                                        year: "numeric", month: "long", day: "numeric",
-                                    })}
-                                </span>
+                                <span>{new Date(article.publishedAt).toLocaleDateString("nl-NL", { year: "numeric", month: "long", day: "numeric" })}</span>
                             )}
                         </div>
                     </header>
 
                     {article.featuredImage && (
-                        <img
-                            src={article.featuredImage}
-                            alt={article.title}
-                            style={{ width: "100%", borderRadius: 16, marginBottom: 32, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
-                        />
+                        <img src={article.featuredImage} alt={article.title}
+                            style={{ width: "100%", borderRadius: 16, marginBottom: 32, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }} />
                     )}
 
-                    <article
-                        style={{ fontSize: 16, lineHeight: 1.8, color: "#374151" }}
-                        dangerouslySetInnerHTML={{ __html: article.content || "" }}
-                    />
+                    <article style={{ fontSize: 16, lineHeight: 1.8, color: "#374151" }}
+                        dangerouslySetInnerHTML={{ __html: article.content || "" }} />
+
+                    {/* Related Articles */}
+                    {related.length > 0 && (
+                        <div style={{ marginTop: 48, paddingTop: 32, borderTop: "1px solid #E8EEF4" }}>
+                            <h3 style={{ fontSize: 20, fontWeight: 700, color: "#16324F", marginBottom: 16 }}>Gerelateerde artikelen</h3>
+                            <div style={{ display: "grid", gap: 12 }}>
+                                {related.map(r => (
+                                    <Link key={r.id} href={`/kenniscentrum/${r.slug}`}
+                                        style={{ textDecoration: "none", display: "block", padding: "14px 18px", background: "#F7F9FC", borderRadius: 10, border: "1px solid #E8EEF4", color: "#24507A", fontWeight: 600, fontSize: 15 }}>
+                                        → {r.title}
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* CTA */}
                     <div style={{ marginTop: 48, padding: 32, background: "linear-gradient(135deg, #16324F, #1a3a5c)", borderRadius: 16, textAlign: "center" }}>
