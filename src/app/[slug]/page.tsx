@@ -140,11 +140,37 @@ export default async function GeoPage({ params }: PageProps) {
                 {/* Content */}
                 <section style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
                     {page.content ? (
+                        <>
+                        <style dangerouslySetInnerHTML={{ __html: `
+                            .article-content { font-size: 17px; line-height: 1.85; color: #374151; }
+                            .article-content > *:first-child { margin-top: 0; }
+                            .article-content h2 { font-size: 26px; font-weight: 800; color: #16324F; margin: 48px 0 16px; line-height: 1.25; letter-spacing: -0.02em; padding-bottom: 10px; border-bottom: 2px solid #F59E0B; }
+                            .article-content h3 { font-size: 21px; font-weight: 700; color: #1E293B; margin: 36px 0 12px; line-height: 1.3; }
+                            .article-content h4 { font-size: 18px; font-weight: 600; color: #334155; margin: 28px 0 10px; }
+                            .article-content p { margin: 16px 0; }
+                            .article-content a { color: #D97706; text-decoration: underline; text-decoration-color: rgba(217,119,6,0.3); }
+                            .article-content a:hover { text-decoration-color: #D97706; }
+                            .article-content ul { list-style: none; padding-left: 0; margin: 20px 0; }
+                            .article-content ul li { position: relative; padding-left: 24px; margin: 10px 0; }
+                            .article-content ul li::before { content: ''; position: absolute; left: 2px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: #F59E0B; }
+                            .article-content ol { padding-left: 24px; margin: 20px 0; counter-reset: item; }
+                            .article-content ol li { margin: 10px 0; counter-increment: item; list-style: none; position: relative; padding-left: 8px; }
+                            .article-content ol li::before { content: counter(item) '.'; position: absolute; left: -24px; top: 0; font-weight: 700; color: #F59E0B; }
+                            .article-content blockquote { margin: 28px 0; padding: 20px 24px; border-left: 4px solid #F59E0B; background: rgba(245,158,11,0.04); border-radius: 0 12px 12px 0; font-style: italic; color: #4B5563; }
+                            .article-content blockquote p { margin: 8px 0; }
+                            .article-content img { max-width: 100%; height: auto; border-radius: 12px; margin: 28px 0; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+                            .article-content hr { border: none; height: 2px; margin: 40px 0; background: linear-gradient(to right, transparent, #E8EEF4, transparent); }
+                            .article-content code { background: #F1F5F9; padding: 2px 6px; border-radius: 4px; font-size: 14px; color: #B45309; }
+                            .article-content pre { background: #1E293B; padding: 20px 24px; border-radius: 12px; overflow-x: auto; margin: 24px 0; }
+                            .article-content pre code { background: none; color: #E2E8F0; padding: 0; font-size: 13px; }
+                            .article-content strong { font-weight: 700; color: #1E293B; }
+                            .article-content u { text-decoration: underline; text-decoration-color: #F59E0B; text-underline-offset: 3px; }
+                        `}} />
                         <div 
                             className="article-content"
-                            style={{ fontSize: 16, lineHeight: 1.8, color: "#374151" }}
                             dangerouslySetInnerHTML={{ __html: page.content }} 
                         />
+                        </>
                     ) : (
                         <p style={{ color: "#9CA3AF", textAlign: "center" }}>Inhoud wordt binnenkort toegevoegd.</p>
                     )}

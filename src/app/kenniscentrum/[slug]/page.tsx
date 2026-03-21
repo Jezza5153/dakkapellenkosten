@@ -139,7 +139,132 @@ export default async function ArticlePage({ params }: PageProps) {
                             style={{ width: "100%", borderRadius: 16, marginBottom: 32, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }} />
                     )}
 
-                    <article style={{ fontSize: 16, lineHeight: 1.8, color: "#374151" }}
+                    {/* Article Content — Full typography styles */}
+                    <style dangerouslySetInnerHTML={{ __html: `
+                        .article-content { font-size: 17px; line-height: 1.85; color: #374151; }
+                        .article-content > *:first-child { margin-top: 0; }
+
+                        /* Headings */
+                        .article-content h2 {
+                            font-size: 26px; font-weight: 800; color: #16324F; margin: 48px 0 16px;
+                            line-height: 1.25; letter-spacing: -0.02em;
+                            padding-bottom: 10px; border-bottom: 2px solid #F59E0B;
+                        }
+                        .article-content h3 {
+                            font-size: 21px; font-weight: 700; color: #1E293B; margin: 36px 0 12px;
+                            line-height: 1.3;
+                        }
+                        .article-content h4 {
+                            font-size: 18px; font-weight: 600; color: #334155; margin: 28px 0 10px;
+                        }
+
+                        /* Paragraphs */
+                        .article-content p { margin: 16px 0; }
+                        .article-content p + p { margin-top: 20px; }
+
+                        /* Links */
+                        .article-content a {
+                            color: #D97706; text-decoration: underline;
+                            text-decoration-color: rgba(217,119,6,0.3);
+                            transition: text-decoration-color 0.2s;
+                        }
+                        .article-content a:hover { text-decoration-color: #D97706; }
+
+                        /* Lists */
+                        .article-content ul {
+                            list-style: none; padding-left: 0; margin: 20px 0;
+                        }
+                        .article-content ul li {
+                            position: relative; padding-left: 24px; margin: 10px 0;
+                        }
+                        .article-content ul li::before {
+                            content: ''; position: absolute; left: 2px; top: 11px;
+                            width: 8px; height: 8px; border-radius: 50%;
+                            background: #F59E0B;
+                        }
+                        .article-content ol {
+                            padding-left: 24px; margin: 20px 0;
+                            counter-reset: item;
+                        }
+                        .article-content ol li {
+                            margin: 10px 0; counter-increment: item;
+                            list-style: none; position: relative; padding-left: 8px;
+                        }
+                        .article-content ol li::before {
+                            content: counter(item) '.';
+                            position: absolute; left: -24px; top: 0;
+                            font-weight: 700; color: #F59E0B;
+                        }
+
+                        /* Blockquotes */
+                        .article-content blockquote {
+                            margin: 28px 0; padding: 20px 24px;
+                            border-left: 4px solid #F59E0B;
+                            background: rgba(245,158,11,0.04);
+                            border-radius: 0 12px 12px 0;
+                            font-style: italic; color: #4B5563;
+                        }
+                        .article-content blockquote p { margin: 8px 0; }
+
+                        /* Images */
+                        .article-content img {
+                            max-width: 100%; height: auto;
+                            border-radius: 12px; margin: 28px 0;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+                        }
+
+                        /* Horizontal rules */
+                        .article-content hr {
+                            border: none; height: 2px; margin: 40px 0;
+                            background: linear-gradient(to right, transparent, #E8EEF4, transparent);
+                        }
+
+                        /* Code blocks */
+                        .article-content code {
+                            background: #F1F5F9; padding: 2px 6px;
+                            border-radius: 4px; font-size: 14px;
+                            color: #B45309; font-family: 'JetBrains Mono', monospace;
+                        }
+                        .article-content pre {
+                            background: #1E293B; padding: 20px 24px;
+                            border-radius: 12px; overflow-x: auto;
+                            margin: 24px 0;
+                        }
+                        .article-content pre code {
+                            background: none; color: #E2E8F0; padding: 0;
+                            font-size: 13px; line-height: 1.6;
+                        }
+
+                        /* Tables */
+                        .article-content table {
+                            width: 100%; border-collapse: collapse; margin: 24px 0;
+                            border-radius: 8px; overflow: hidden;
+                        }
+                        .article-content th {
+                            background: #16324F; color: white; padding: 12px 16px;
+                            text-align: left; font-size: 13px; font-weight: 700;
+                            text-transform: uppercase; letter-spacing: 0.04em;
+                        }
+                        .article-content td {
+                            padding: 12px 16px; border-bottom: 1px solid #E8EEF4;
+                            font-size: 15px;
+                        }
+                        .article-content tr:nth-child(even) td { background: #F7F9FC; }
+
+                        /* Strong/Bold */
+                        .article-content strong { font-weight: 700; color: #1E293B; }
+
+                        /* Underline */
+                        .article-content u {
+                            text-decoration: underline;
+                            text-decoration-color: #F59E0B;
+                            text-underline-offset: 3px;
+                        }
+
+                        /* Spacing after featured image */
+                        .article-content > h2:first-child { margin-top: 0; }
+                    `}} />
+                    <div className="article-content"
                         dangerouslySetInnerHTML={{ __html: article.content || "" }} />
 
                     {/* Related Articles */}
