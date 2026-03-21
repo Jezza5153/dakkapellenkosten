@@ -1,18 +1,23 @@
 /**
  * Lead Notes API — GET / POST
+ * With audit logging
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { logAudit } from "@/lib/admin/audit";
 
 async function requireAdmin() {
     const session = await auth();
     if (!session?.user) return null;
     const role = (session.user as any).role;
     if (role !== "admin") return null;
-    return { userId: (session.user as any).id || session.user.id };
+    return {
+        userId: (session.user as any).id || session.user.id,
+        userName: (session.user as any).name || session.user.email || "Onbekend",
+    };
 }
 
 export async function GET(
@@ -56,6 +61,16 @@ export async function POST(
         authorId: authResult.userId,
         content: body.content.trim(),
     }).returning();
+
+    // Audit log
+    await logAudit({
+        actorId: authResult.userId,
+        actorName: authResult.userName,
+        action: "create",
+        entityType: "lead_note",
+        entityId: note.id,
+        entityTitle: body.content.trim().substring(0, 80),
+    });
 
     return NextResponse.json({ note }, { status: 201 });
 }

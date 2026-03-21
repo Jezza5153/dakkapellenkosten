@@ -5,9 +5,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { eq, desc, ilike, and, sql } from "drizzle-orm";
+import { eq, desc, asc, ilike, and, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
+import { logAudit } from "@/lib/admin/audit";
 
 const createArticleSchema = z.object({
     title: z.string().min(1).max(500),
@@ -33,7 +34,7 @@ async function requireAdmin(request?: NextRequest) {
     if (role !== "admin" && role !== "editor") {
         return { error: "Geen toegang", status: 403 };
     }
-    return { session, userId: (session.user as any).id || session.user.id };
+    return { session, userId: (session.user as any).id || session.user.id, userName: (session.user as any).name || session.user.email || "Onbekend" };
 }
 
 export async function GET(request: NextRequest) {
@@ -45,24 +46,42 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
+    const category = searchParams.get("category");
+    const sortBy = searchParams.get("sortBy") || "updatedAt";
+    const sortDir = searchParams.get("sortDir") || "desc";
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const limit = parseInt(searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
 
     const conditions = [];
+    // Exclude soft-deleted articles
+    conditions.push(sql`${schema.articles.deletedAt} IS NULL`);
     if (status && status !== "all") {
         conditions.push(eq(schema.articles.status, status as any));
     }
     if (search) {
         conditions.push(ilike(schema.articles.title, `%${search}%`));
     }
+    if (category) {
+        conditions.push(eq(schema.articles.category, category));
+    }
 
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const where = and(...conditions);
+
+    // Dynamic sort
+    const sortColumn = {
+        title: schema.articles.title,
+        status: schema.articles.status,
+        category: schema.articles.category,
+        updatedAt: schema.articles.updatedAt,
+        publishedAt: schema.articles.publishedAt,
+    }[sortBy] || schema.articles.updatedAt;
+    const orderFn = sortDir === "asc" ? asc : desc;
 
     const [articles, countResult] = await Promise.all([
         db.query.articles.findMany({
             where,
-            orderBy: [desc(schema.articles.updatedAt)],
+            orderBy: [orderFn(sortColumn)],
             limit,
             offset,
             with: { author: { columns: { name: true } } },
@@ -76,7 +95,7 @@ export async function GET(request: NextRequest) {
         articles,
         total: Number(countResult[0]?.count || 0),
         page,
-        limit,
+        perPage: limit,
     });
 }
 
@@ -121,6 +140,16 @@ export async function POST(request: NextRequest) {
         publishedAt: data.status === "published" ? new Date() : (data.publishedAt ? new Date(data.publishedAt) : null),
         scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
     }).returning();
+
+    // Audit log
+    await logAudit({
+        actorId: authResult.userId,
+        actorName: authResult.userName,
+        action: "create",
+        entityType: "article",
+        entityId: article.id,
+        entityTitle: data.title,
+    });
 
     return NextResponse.json({ article }, { status: 201 });
 }

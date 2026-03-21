@@ -1,6 +1,6 @@
 /**
  * Admin Dashboard — /admin
- * Overview stats for admin panel
+ * Platform dashboard: CRM stats from dedicated API, audit feed, content health, drafts
  */
 "use client";
 
@@ -8,108 +8,331 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-interface DashboardData {
-    stats: {
-        totalCompanies: number;
-        activeSubscriptions: number;
-        totalLeads: number;
-        recentLeads30d: number;
-        totalLeadsAccepted: number;
-        totalCreditsInCirculation: number;
-        totalCreditsSpent: number;
-    };
-    articleCount?: number;
-    pageCount?: number;
+interface CrmStats {
+    totalLeads: number;
+    recentLeads30d: number;
+    funnel: Record<string, number>;
+    companyStats: { total: number; verified: number; withReviews: number; avgRating: string | null };
+}
+
+interface ArticleSummary {
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+    category: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    featuredImage: string | null;
+    updatedAt: string;
+}
+
+interface PageSummary {
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+    city: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    updatedAt: string;
+}
+
+interface AuditEvent {
+    id: string;
+    action: string;
+    entityType: string;
+    entityTitle: string | null;
+    actorName: string | null;
+    createdAt: string;
 }
 
 export default function AdminDashboard() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
-    const [data, setData] = useState<DashboardData | null>(null);
+    const [crmStats, setCrmStats] = useState<CrmStats | null>(null);
+    const [articles, setArticles] = useState<ArticleSummary[]>([]);
+    const [pages, setPages] = useState<PageSummary[]>([]);
+    const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
 
     useEffect(() => {
         Promise.all([
-            fetch("/api/admin/dashboard").then(r => {
-                if (!r.ok) throw new Error("Geen toegang");
-                return r.json();
-            }),
-            fetch("/api/admin/articles?limit=1").then(r => r.ok ? r.json() : { total: 0 }),
+            fetch("/api/admin/crm/stats").then(r => r.ok ? r.json() : null),
+            fetch("/api/admin/articles?limit=50&sortBy=updatedAt&sortDir=desc").then(r => r.ok ? r.json() : { articles: [] }),
+            fetch("/api/admin/pages?limit=50&sortBy=updatedAt&sortDir=desc").then(r => r.ok ? r.json() : { pages: [] }),
+            fetch("/api/admin/audit-log?limit=10").then(r => r.ok ? r.json() : { events: [] }),
         ])
-            .then(([dashboard, articles]) => {
-                setData({
-                    ...dashboard,
-                    articleCount: articles.total || 0,
-                });
+            .then(([crm, articlesData, pagesData, auditData]) => {
+                setCrmStats(crm);
+                setArticles(articlesData.articles || []);
+                setPages(pagesData.pages || []);
+                setAuditEvents(auditData.events || []);
                 setLoading(false);
             })
             .catch(() => router.push("/dashboard"));
     }, [router]);
 
-    if (loading || !data) {
+    if (loading || !crmStats) {
         return (
-            <div className="p-8 text-center text-gray-400">Laden...</div>
+            <div className="p-8 text-center text-gray-400">
+                <div className="inline-block w-5 h-5 border-2 border-gray-600 border-t-amber-400 rounded-full animate-spin mr-2" />
+                Laden...
+            </div>
         );
     }
 
-    const stats = [
-        { label: "Bedrijven", value: data.stats.totalCompanies, color: "text-blue-400", href: "/admin/companies" },
-        { label: "Actieve abonnementen", value: data.stats.activeSubscriptions, color: "text-emerald-400" },
-        { label: "Totaal leads", value: data.stats.totalLeads, color: "text-yellow-400", href: "/admin/leads" },
-        { label: "Leads (30d)", value: data.stats.recentLeads30d, color: "text-yellow-400", href: "/admin/leads" },
-        { label: "Leads geaccepteerd", value: data.stats.totalLeadsAccepted, color: "text-emerald-400" },
-        { label: "Credits in omloop", value: data.stats.totalCreditsInCirculation, color: "text-purple-400" },
-        { label: "Artikelen", value: data.articleCount || 0, color: "text-amber-400", href: "/admin/articles" },
-    ];
+    // Derived data
+    const totalArticles = articles.length;
+    const publishedArticles = articles.filter(a => a.status === "published").length;
+    const draftArticles = articles.filter(a => a.status === "draft");
+    const totalPages = pages.length;
+    const publishedPages = pages.filter(p => p.status === "published").length;
+
+    // Content health checks
+    const missingSeoParts = articles.filter(a => a.status === "published" && (!a.seoTitle || !a.seoDescription));
+    const missingImages = articles.filter(a => a.status === "published" && !a.featuredImage);
+    const missingGeoSeo = pages.filter(p => p.status === "published" && (!p.seoTitle || !p.seoDescription));
+
+    // Recent activity (last 8 updated articles + pages combined)
+    const recentActivity = [
+        ...articles.slice(0, 10).map(a => ({ type: "article" as const, id: a.id, title: a.title, status: a.status, updatedAt: a.updatedAt, href: `/admin/articles/${a.id}` })),
+        ...pages.slice(0, 10).map(p => ({ type: "page" as const, id: p.id, title: p.title, status: p.status, updatedAt: p.updatedAt, href: `/admin/pages/${p.id}` })),
+    ]
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 8);
+
+    const healthIssues = missingSeoParts.length + missingImages.length + missingGeoSeo.length;
+
+    const actionIcons: Record<string, string> = {
+        create: "🆕",
+        update: "✏️",
+        delete: "🗑️",
+        restore: "♻️",
+        publish: "🚀",
+        upload: "📤",
+        status_change: "🔄",
+        refund: "💰",
+        adjustment: "💰",
+    };
 
     return (
-        <div className="p-6 lg:p-8">
+        <div className="p-4 lg:p-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-sm text-gray-400 mt-1">Overzicht van het platform</p>
+                <p className="text-sm text-gray-400 mt-0.5">Welkom terug. Hier is een overzicht van je platform.</p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {stats.map(stat => {
-                    const Card = (
-                        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5 hover:border-gray-600 transition-colors">
-                            <div className="text-xs text-gray-400 uppercase tracking-wider">{stat.label}</div>
-                            <div className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</div>
+            {/* ── At a Glance — clickable KPIs ────────────── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+                {[
+                    { label: "Bedrijven", value: crmStats.companyStats.total, color: "text-blue-400", href: "/admin/companies" },
+                    { label: "Geverifieerd", value: crmStats.companyStats.verified, color: "text-emerald-400", href: "/admin/companies" },
+                    { label: "Totaal leads", value: crmStats.totalLeads, color: "text-yellow-400", href: "/admin/leads" },
+                    { label: "Leads (30d)", value: crmStats.recentLeads30d, color: "text-yellow-400", href: "/admin/leads" },
+                    { label: "Artikelen", value: `${publishedArticles}/${totalArticles}`, color: "text-amber-400", href: "/admin/articles" },
+                    { label: "Pagina's", value: `${publishedPages}/${totalPages}`, color: "text-purple-400", href: "/admin/pages" },
+                    { label: "Beoordeling", value: crmStats.companyStats.avgRating || "—", color: "text-cyan-400", href: "/admin/crm" },
+                ].map(stat => (
+                    <Link key={stat.label} href={stat.href}>
+                        <div className="bg-gray-800 rounded-xl border border-gray-700 p-4 hover:border-gray-600 transition-colors cursor-pointer">
+                            <div className="text-[10px] text-gray-400 uppercase tracking-wider">{stat.label}</div>
+                            <div className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</div>
                         </div>
-                    );
-                    return stat.href ? (
-                        <Link key={stat.label} href={stat.href}>{Card}</Link>
-                    ) : (
-                        <div key={stat.label}>{Card}</div>
-                    );
-                })}
+                    </Link>
+                ))}
             </div>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Link
-                    href="/admin/articles/new"
-                    className="bg-gray-800 rounded-xl border border-gray-700 p-5 hover:border-amber-400/30 transition-colors group"
-                >
-                    <div className="text-2xl mb-2">📝</div>
-                    <div className="font-semibold group-hover:text-amber-400 transition-colors">Nieuw artikel</div>
-                    <div className="text-xs text-gray-400 mt-1">Schrijf een blog of kenniscentrum artikel</div>
-                </Link>
-                <Link
-                    href="/admin/leads"
-                    className="bg-gray-800 rounded-xl border border-gray-700 p-5 hover:border-emerald-400/30 transition-colors group"
-                >
-                    <div className="text-2xl mb-2">👥</div>
-                    <div className="font-semibold group-hover:text-emerald-400 transition-colors">Leads beheren</div>
-                    <div className="text-xs text-gray-400 mt-1">Bekijk en beheer binnenkomende leads</div>
-                </Link>
-                <Link
-                    href="/admin/companies"
-                    className="bg-gray-800 rounded-xl border border-gray-700 p-5 hover:border-blue-400/30 transition-colors group"
-                >
-                    <div className="text-2xl mb-2">🏢</div>
-                    <div className="font-semibold group-hover:text-blue-400 transition-colors">Bedrijven</div>
-                    <div className="text-xs text-gray-400 mt-1">Beheer dakkapel specialisten</div>
-                </Link>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+                {/* ── Left Column ─────────────────────────── */}
+                <div className="space-y-6">
+                    {/* Recent Content Activity */}
+                    <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+                        <h2 className="text-sm font-semibold mb-3">Recente content</h2>
+                        {recentActivity.length === 0 ? (
+                            <p className="text-sm text-gray-500">Nog geen activiteit.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {recentActivity.map(item => (
+                                    <Link
+                                        key={`${item.type}-${item.id}`}
+                                        href={item.href}
+                                        className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-700/50 transition-colors group"
+                                    >
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <span className="text-base shrink-0">{item.type === "article" ? "📝" : "📄"}</span>
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium truncate group-hover:text-amber-400 transition-colors">{item.title}</div>
+                                                <div className="text-[10px] text-gray-500">{item.type === "article" ? "Artikel" : "Pagina"}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                item.status === "published" ? "bg-emerald-900/80 text-emerald-300" : "bg-gray-700 text-gray-400"
+                                            }`}>
+                                                {item.status === "published" ? "live" : "concept"}
+                                            </span>
+                                            <span className="text-[10px] text-gray-500">
+                                                {new Date(item.updatedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                                            </span>
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Audit Activity Feed */}
+                    <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-sm font-semibold">Audit trail</h2>
+                            <Link href="/admin/audit-log" className="text-xs text-amber-400 hover:text-amber-300">Alles bekijken →</Link>
+                        </div>
+                        {auditEvents.length === 0 ? (
+                            <p className="text-sm text-gray-500">Nog geen events.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {auditEvents.slice(0, 6).map(event => (
+                                    <div key={event.id} className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-gray-700/30">
+                                        <span className="text-base mt-0.5">{actionIcons[event.action] || "📋"}</span>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-sm">
+                                                <span className="font-medium text-gray-200">{event.actorName || "Systeem"}</span>
+                                                <span className="text-gray-500 mx-1">→</span>
+                                                <span className="text-gray-400">{event.action}</span>
+                                                <span className="text-gray-500 mx-1">→</span>
+                                                <span className="text-gray-300 font-medium truncate">{event.entityTitle || event.entityType}</span>
+                                            </div>
+                                            <div className="text-[10px] text-gray-600 mt-0.5">
+                                                {new Date(event.createdAt).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ── Right Column ────────────────────────── */}
+                <div className="space-y-6">
+                    {/* Quick Actions */}
+                    <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+                        <h2 className="text-sm font-semibold mb-3">Snelle acties</h2>
+                        <div className="space-y-2">
+                            <Link href="/admin/articles/new" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors group">
+                                <span className="text-lg">📝</span>
+                                <div>
+                                    <div className="text-sm font-medium group-hover:text-amber-400 transition-colors">Nieuw artikel</div>
+                                    <div className="text-[10px] text-gray-500">Blog of kenniscentrum</div>
+                                </div>
+                            </Link>
+                            <Link href="/admin/pages/new" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors group">
+                                <span className="text-lg">📄</span>
+                                <div>
+                                    <div className="text-sm font-medium group-hover:text-amber-400 transition-colors">Nieuwe pagina</div>
+                                    <div className="text-[10px] text-gray-500">SEO landing of geo-page</div>
+                                </div>
+                            </Link>
+                            <Link href="/admin/media" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors group">
+                                <span className="text-lg">🖼️</span>
+                                <div>
+                                    <div className="text-sm font-medium group-hover:text-amber-400 transition-colors">Media uploaden</div>
+                                    <div className="text-[10px] text-gray-500">Afbeeldingen beheren</div>
+                                </div>
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Lead Funnel */}
+                    <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+                        <h2 className="text-sm font-semibold mb-3">Lead funnel</h2>
+                        <div className="space-y-2">
+                            {Object.entries(crmStats.funnel).map(([status, count]) => {
+                                const total = crmStats.totalLeads || 1;
+                                const pct = Math.round((count / total) * 100);
+                                const colors: Record<string, string> = {
+                                    new: "bg-blue-500",
+                                    matching: "bg-yellow-500",
+                                    available: "bg-amber-500",
+                                    fulfilled: "bg-emerald-500",
+                                    expired: "bg-gray-500",
+                                    cancelled: "bg-red-500",
+                                };
+                                return (
+                                    <div key={status}>
+                                        <div className="flex justify-between text-xs mb-1">
+                                            <span className="text-gray-400 capitalize">{status}</span>
+                                            <span className="text-gray-500">{count} ({pct}%)</span>
+                                        </div>
+                                        <div className="w-full bg-gray-700 rounded-full h-1.5">
+                                            <div
+                                                className={`h-1.5 rounded-full ${colors[status] || "bg-gray-500"}`}
+                                                style={{ width: `${pct}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Drafts needing attention */}
+                    {draftArticles.length > 0 && (
+                        <div className="bg-gray-800 rounded-xl border border-yellow-700/40 p-5">
+                            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <span className="text-yellow-400">⚠</span> Concepten ({draftArticles.length})
+                            </h2>
+                            <div className="space-y-1.5">
+                                {draftArticles.slice(0, 5).map(draft => (
+                                    <Link
+                                        key={draft.id}
+                                        href={`/admin/articles/${draft.id}`}
+                                        className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-700/50 transition-colors text-sm"
+                                    >
+                                        <span className="truncate">{draft.title}</span>
+                                        <span className="text-[10px] text-gray-500 shrink-0 ml-2">
+                                            {new Date(draft.updatedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                                        </span>
+                                    </Link>
+                                ))}
+                                {draftArticles.length > 5 && (
+                                    <Link href="/admin/articles?status=draft" className="text-xs text-amber-400 hover:underline block pt-1">
+                                        +{draftArticles.length - 5} meer →
+                                    </Link>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Content Health */}
+                    {healthIssues > 0 && (
+                        <div className="bg-gray-800 rounded-xl border border-red-700/30 p-5">
+                            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <span className="text-red-400">🔴</span> Content health ({healthIssues} issues)
+                            </h2>
+                            <div className="space-y-2 text-sm">
+                                {missingSeoParts.length > 0 && (
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <span className="text-yellow-400">⚠</span>
+                                        {missingSeoParts.length} artikel(en) missen SEO title/description
+                                    </div>
+                                )}
+                                {missingImages.length > 0 && (
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <span className="text-yellow-400">⚠</span>
+                                        {missingImages.length} artikel(en) missen featured image
+                                    </div>
+                                )}
+                                {missingGeoSeo.length > 0 && (
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <span className="text-yellow-400">⚠</span>
+                                        {missingGeoSeo.length} pagina&apos;s missen SEO fields
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

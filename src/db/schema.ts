@@ -225,6 +225,10 @@ export const leads = pgTable("leads", {
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     expiresAt: timestamp("expires_at"),
+
+    // Assignment
+    assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
+    followUpAt: timestamp("follow_up_at"),
 });
 
 // ============================================
@@ -340,8 +344,13 @@ export const articles = pgTable("articles", {
     // Publishing
     status: contentStatusEnum("status").notNull().default("draft"),
     authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
     publishedAt: timestamp("published_at"),
     scheduledAt: timestamp("scheduled_at"),
+
+    // Soft delete
+    deletedAt: timestamp("deleted_at"),
+    deletedBy: uuid("deleted_by").references(() => users.id, { onDelete: "set null" }),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -356,10 +365,13 @@ export const pages = pgTable("pages", {
     title: varchar("title", { length: 500 }).notNull(),
     slug: varchar("slug", { length: 500 }).notNull().unique(),
     content: text("content"),
+    featuredImage: text("featured_image"),
 
     // SEO
     seoTitle: varchar("seo_title", { length: 200 }),
     seoDescription: text("seo_description"),
+    canonicalUrl: text("canonical_url"),
+    structuredData: jsonb("structured_data"),
 
     // Location targeting
     city: varchar("city", { length: 100 }),
@@ -368,6 +380,12 @@ export const pages = pgTable("pages", {
     // Publishing
     status: contentStatusEnum("status").notNull().default("draft"),
     authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at"),
+
+    // Soft delete
+    deletedAt: timestamp("deleted_at"),
+    deletedBy: uuid("deleted_by").references(() => users.id, { onDelete: "set null" }),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -386,7 +404,13 @@ export const media = pgTable("media", {
     sizeBytes: integer("size_bytes"),
     width: integer("width"),
     height: integer("height"),
+    folder: varchar("folder", { length: 100 }),
     uploadedById: uuid("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
+
+    // Soft delete
+    deletedAt: timestamp("deleted_at"),
+    deletedBy: uuid("deleted_by").references(() => users.id, { onDelete: "set null" }),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -413,6 +437,100 @@ export const leadNotes = pgTable("lead_notes", {
     leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
     authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
     content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// Content Revisions (version history)
+// ============================================
+
+export const contentRevisions = pgTable("content_revisions", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    entityType: varchar("entity_type", { length: 20 }).notNull(),
+    entityId: uuid("entity_id").notNull(),
+    revisionNumber: integer("revision_number").notNull(),
+    title: varchar("title", { length: 500 }),
+    content: text("content"),
+    excerpt: text("excerpt"),
+    seoTitle: varchar("seo_title", { length: 200 }),
+    seoDescription: text("seo_description"),
+    metadata: jsonb("metadata"),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+    entityRevision: uniqueIndex("content_revisions_entity_idx")
+        .on(table.entityType, table.entityId, table.revisionNumber),
+}));
+
+// ============================================
+// Audit Events (real audit trail)
+// ============================================
+
+export const auditEvents = pgTable("audit_events", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    actorName: varchar("actor_name", { length: 255 }),
+    action: varchar("action", { length: 50 }).notNull(),
+    entityType: varchar("entity_type", { length: 30 }).notNull(),
+    entityId: uuid("entity_id"),
+    entityTitle: varchar("entity_title", { length: 500 }),
+    diff: jsonb("diff"),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// Redirects (301 management)
+// ============================================
+
+export const redirects = pgTable("redirects", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    fromPath: varchar("from_path", { length: 500 }).notNull().unique(),
+    toPath: varchar("to_path", { length: 500 }).notNull(),
+    statusCode: integer("status_code").notNull().default(301),
+    hitCount: integer("hit_count").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// Settings (key-value config)
+// ============================================
+
+export const settings = pgTable("settings", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    key: varchar("key", { length: 100 }).notNull().unique(),
+    value: jsonb("value"),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// Content Locks (prevents concurrent editing)
+// ============================================
+
+export const contentLocks = pgTable("content_locks", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    entityType: varchar("entity_type", { length: 20 }).notNull(),
+    entityId: uuid("entity_id").notNull(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    lockedAt: timestamp("locked_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+}, (table) => ({
+    entityLock: uniqueIndex("content_locks_entity_idx").on(table.entityType, table.entityId),
+}));
+
+// ============================================
+// Lead Tasks
+// ============================================
+
+export const leadTasks = pgTable("lead_tasks", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
+    title: varchar("title", { length: 255 }).notNull(),
+    dueAt: timestamp("due_at"),
+    completedAt: timestamp("completed_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -455,6 +573,7 @@ export const serviceAreasRelations = relations(serviceAreas, ({ one }) => ({
 export const leadsRelations = relations(leads, ({ many }) => ({
     matches: many(leadMatches),
     notes: many(leadNotes),
+    tasks: many(leadTasks),
 }));
 
 export const leadMatchesRelations = relations(leadMatches, ({ one }) => ({
@@ -496,4 +615,29 @@ export const mediaRelations = relations(media, ({ one }) => ({
 export const leadNotesRelations = relations(leadNotes, ({ one }) => ({
     lead: one(leads, { fields: [leadNotes.leadId], references: [leads.id] }),
     author: one(users, { fields: [leadNotes.authorId], references: [users.id] }),
+}));
+
+export const contentRevisionsRelations = relations(contentRevisions, ({ one }) => ({
+    author: one(users, { fields: [contentRevisions.authorId], references: [users.id] }),
+}));
+
+export const auditEventsRelations = relations(auditEvents, ({ one }) => ({
+    actor: one(users, { fields: [auditEvents.actorId], references: [users.id] }),
+}));
+
+export const redirectsRelations = relations(redirects, ({ one }) => ({
+    creator: one(users, { fields: [redirects.createdBy], references: [users.id] }),
+}));
+
+export const settingsRelations = relations(settings, ({ one }) => ({
+    updater: one(users, { fields: [settings.updatedBy], references: [users.id] }),
+}));
+
+export const contentLocksRelations = relations(contentLocks, ({ one }) => ({
+    user: one(users, { fields: [contentLocks.userId], references: [users.id] }),
+}));
+
+export const leadTasksRelations = relations(leadTasks, ({ one }) => ({
+    lead: one(leads, { fields: [leadTasks.leadId], references: [leads.id] }),
+    assignee: one(users, { fields: [leadTasks.assignedTo], references: [users.id] }),
 }));

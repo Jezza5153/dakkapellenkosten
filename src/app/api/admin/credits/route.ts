@@ -1,14 +1,16 @@
 /**
  * Admin Credit Adjustment — POST /api/admin/credits
  * Refund or adjust credits for a company
+ * With audit logging
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
-import { addCredits, refundCredits } from "@/lib/credits";
+import { addCredits } from "@/lib/credits";
 import { z } from "zod";
+import { logAudit } from "@/lib/admin/audit";
 
 const adjustSchema = z.object({
     companyId: z.string().uuid(),
@@ -41,12 +43,34 @@ export async function POST(request: NextRequest) {
 
         const { companyId, amount, type, description } = parsed.data;
 
+        // Get company name for audit
+        const company = await db.query.companies.findFirst({
+            where: eq(schema.companies.id, companyId),
+            columns: { name: true },
+        });
+
         const newBalance = await addCredits({
             companyId,
             amount: Math.abs(amount),
             description: `[Admin] ${description}`,
             adminUserId: session.user.id,
             type,
+        });
+
+        // Audit log
+        await logAudit({
+            actorId: session.user.id,
+            actorName: user.name,
+            action: type === "refund" ? "refund" : "adjustment",
+            entityType: "credits",
+            entityId: companyId,
+            entityTitle: company?.name || companyId,
+            diff: {
+                amount: { old: null, new: amount },
+                type: { old: null, new: type },
+                description: { old: null, new: description },
+                newBalance: { old: null, new: newBalance },
+            },
         });
 
         return NextResponse.json({ success: true, newBalance });

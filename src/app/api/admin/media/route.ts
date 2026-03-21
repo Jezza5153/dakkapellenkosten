@@ -4,17 +4,21 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { desc } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
+import { logAudit } from "@/lib/admin/audit";
 
 async function requireAdmin() {
     const session = await auth();
     if (!session?.user) return null;
     const role = (session.user as any).role;
     if (role !== "admin" && role !== "editor") return null;
-    return { userId: (session.user as any).id || session.user.id };
+    return {
+        userId: (session.user as any).id || session.user.id,
+        userName: (session.user as any).name || session.user.email || "Onbekend",
+    };
 }
 
 export async function GET() {
@@ -24,6 +28,7 @@ export async function GET() {
     }
 
     const media = await db.query.media.findMany({
+        where: sql`${schema.media.deletedAt} IS NULL`,
         orderBy: [desc(schema.media.createdAt)],
     });
 
@@ -80,6 +85,16 @@ export async function POST(request: NextRequest) {
         sizeBytes: file.size,
         uploadedById: authResult.userId,
     }).returning();
+
+    // Audit log
+    await logAudit({
+        actorId: authResult.userId,
+        actorName: authResult.userName,
+        action: "upload",
+        entityType: "media",
+        entityId: mediaItem.id,
+        entityTitle: file.name,
+    });
 
     return NextResponse.json({ media: mediaItem }, { status: 201 });
 }

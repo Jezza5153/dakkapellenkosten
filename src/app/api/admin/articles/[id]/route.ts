@@ -1,6 +1,6 @@
 /**
- * Article Detail API — GET / PUT / DELETE
- * Admin-only endpoint
+ * Article Detail API — GET / PUT / PATCH / DELETE
+ * With audit logging, revision creation, and soft delete
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,6 +8,8 @@ import { db, schema } from "@/db";
 import { eq, and, ne } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
+import { logAudit, computeDiff } from "@/lib/admin/audit";
+import { createRevision } from "@/lib/admin/revisions";
 
 const updateArticleSchema = z.object({
     title: z.string().min(1).max(500).optional(),
@@ -33,7 +35,11 @@ async function requireAdmin() {
     if (role !== "admin" && role !== "editor") {
         return { error: "Geen toegang", status: 403 };
     }
-    return { session, userId: (session.user as any).id || session.user.id };
+    return {
+        session,
+        userId: (session.user as any).id || session.user.id,
+        userName: (session.user as any).name || session.user.email || "Onbekend",
+    };
 }
 
 export async function GET(
@@ -59,7 +65,7 @@ export async function GET(
     return NextResponse.json({ article });
 }
 
-export async function PUT(
+async function handleUpdate(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -81,7 +87,7 @@ export async function PUT(
 
     const data = parsed.data;
 
-    // Check slug uniqueness if changing slug
+    // Check slug uniqueness
     if (data.slug) {
         const existing = await db.query.articles.findFirst({
             where: and(
@@ -94,7 +100,18 @@ export async function PUT(
         }
     }
 
-    const updateData: any = { updatedAt: new Date() };
+    // Get current state for diff + revision
+    const current = await db.query.articles.findFirst({
+        where: eq(schema.articles.id, id),
+    });
+    if (!current) {
+        return NextResponse.json({ error: "Artikel niet gevonden" }, { status: 404 });
+    }
+
+    const updateData: any = {
+        updatedAt: new Date(),
+        updatedBy: authResult.userId,
+    };
     if (data.title !== undefined) updateData.title = data.title;
     if (data.slug !== undefined) updateData.slug = data.slug;
     if (data.excerpt !== undefined) updateData.excerpt = data.excerpt || null;
@@ -107,7 +124,7 @@ export async function PUT(
 
     if (data.status !== undefined) {
         updateData.status = data.status;
-        if (data.status === "published" && !data.publishedAt) {
+        if (data.status === "published" && current.status !== "published" && !data.publishedAt) {
             updateData.publishedAt = new Date();
         }
     }
@@ -127,8 +144,43 @@ export async function PUT(
         return NextResponse.json({ error: "Artikel niet gevonden" }, { status: 404 });
     }
 
+    // Create revision on explicit save (not autosave)
+    const isAutosave = request.headers.get("x-autosave") === "true";
+    if (!isAutosave) {
+        await createRevision("article", id, {
+            title: article.title,
+            content: article.content || "",
+            excerpt: article.excerpt || "",
+            seoTitle: article.seoTitle || "",
+            seoDescription: article.seoDescription || "",
+            category: article.category || "",
+            status: article.status,
+        }, authResult.userId);
+    }
+
+    // Audit log
+    const diff = computeDiff(
+        current as any,
+        article as any,
+        ["title", "slug", "content", "status", "seoTitle", "seoDescription", "category", "excerpt"]
+    );
+    if (diff) {
+        await logAudit({
+            actorId: authResult.userId,
+            actorName: authResult.userName,
+            action: data.status === "published" && current.status !== "published" ? "publish" : "update",
+            entityType: "article",
+            entityId: id,
+            entityTitle: article.title,
+            diff,
+        });
+    }
+
     return NextResponse.json({ article });
 }
+
+export const PUT = handleUpdate;
+export const PATCH = handleUpdate;
 
 export async function DELETE(
     request: NextRequest,
@@ -141,13 +193,27 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const [deleted] = await db.delete(schema.articles)
+    // Soft delete instead of hard delete
+    const [article] = await db.update(schema.articles)
+        .set({
+            deletedAt: new Date(),
+            deletedBy: authResult.userId,
+        })
         .where(eq(schema.articles.id, id))
-        .returning({ id: schema.articles.id });
+        .returning({ id: schema.articles.id, title: schema.articles.title });
 
-    if (!deleted) {
+    if (!article) {
         return NextResponse.json({ error: "Artikel niet gevonden" }, { status: 404 });
     }
+
+    await logAudit({
+        actorId: authResult.userId,
+        actorName: authResult.userName,
+        action: "delete",
+        entityType: "article",
+        entityId: id,
+        entityTitle: article.title,
+    });
 
     return NextResponse.json({ success: true });
 }

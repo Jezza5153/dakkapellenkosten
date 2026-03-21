@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { ilike, eq, or, desc } from "drizzle-orm";
+import { ilike, eq, or, desc, sql, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
@@ -26,9 +26,10 @@ export async function GET(request: NextRequest) {
 
     if (!type || type === "article") {
         const articles = await db.query.articles.findMany({
-            where: q
-                ? ilike(schema.articles.title, `%${q}%`)
-                : eq(schema.articles.status, "published"),
+            where: and(
+                sql`${schema.articles.deletedAt} IS NULL`,
+                q ? ilike(schema.articles.title, `%${q}%`) : eq(schema.articles.status, "published")
+            ),
             columns: { id: true, title: true, slug: true },
             orderBy: [desc(schema.articles.updatedAt)],
             limit: 15,
@@ -42,9 +43,10 @@ export async function GET(request: NextRequest) {
 
     if (!type || type === "page") {
         const pages = await db.query.pages.findMany({
-            where: q
-                ? ilike(schema.pages.title, `%${q}%`)
-                : eq(schema.pages.status, "published"),
+            where: and(
+                sql`${schema.pages.deletedAt} IS NULL`,
+                q ? ilike(schema.pages.title, `%${q}%`) : eq(schema.pages.status, "published")
+            ),
             columns: { id: true, title: true, slug: true },
             orderBy: [desc(schema.pages.updatedAt)],
             limit: 15,
