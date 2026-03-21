@@ -52,6 +52,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.email = user.email;
                 token.role = (user as any).role;
             }
+            // Always refresh role from DB to pick up role changes
+            if (token.id) {
+                try {
+                    const dbUser = await db.query.users.findFirst({
+                        where: eq(schema.users.id, token.id as string),
+                        columns: { role: true, name: true },
+                    });
+                    if (dbUser) {
+                        token.role = dbUser.role;
+                        token.name = dbUser.name;
+                    }
+                } catch {
+                    // Silently fall back to cached role
+                }
+            }
             return token;
         },
         async session({ session, token }) {
@@ -59,6 +74,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (token.id) session.user.id = token.id as string;
                 if (token.email) session.user.email = token.email as string;
                 (session.user as any).role = token.role;
+                (session.user as any).name = token.name;
             }
             return session;
         },
