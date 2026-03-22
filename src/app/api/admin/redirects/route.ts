@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, desc, sql } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { logAudit } from "@/lib/admin/audit";
 import { z } from "zod";
 
@@ -15,16 +15,6 @@ const createRedirectSchema = z.object({
     statusCode: z.number().int().min(300).max(399).default(301),
 });
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user) return null;
-    const role = (session.user as any).role;
-    if (role !== "admin") return null;
-    return {
-        userId: (session.user as any).id || session.user.id,
-        userName: (session.user as any).name || session.user.email || "Onbekend",
-    };
-}
 
 export async function GET(request: NextRequest) {
     const authResult = await requireAdmin();

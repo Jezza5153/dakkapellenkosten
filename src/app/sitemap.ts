@@ -5,20 +5,23 @@
 export const dynamic = "force-dynamic";
 
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import type { MetadataRoute } from "next";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-    const baseUrl = "https://dakkapellenkosten.nl";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dakkapellenkosten.nl";
 
     // Static pages
     const staticPages: MetadataRoute.Sitemap = [
         { url: baseUrl, lastModified: new Date(), changeFrequency: "weekly", priority: 1 },
     ];
 
-    // Published articles
+    // Published articles (excluding soft-deleted)
     const articles = await db.query.articles.findMany({
-        where: eq(schema.articles.status, "published"),
+        where: and(
+            eq(schema.articles.status, "published"),
+            isNull(schema.articles.deletedAt),
+        ),
         columns: { slug: true, updatedAt: true },
     });
 
@@ -29,9 +32,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
     }));
 
-    // Published pages
+    // Published pages (excluding soft-deleted)
     const pages = await db.query.pages.findMany({
-        where: eq(schema.pages.status, "published"),
+        where: and(
+            eq(schema.pages.status, "published"),
+            isNull(schema.pages.deletedAt),
+        ),
         columns: { slug: true, updatedAt: true },
     });
 
@@ -44,3 +50,4 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     return [...staticPages, ...articlePages, ...seoPages];
 }
+

@@ -1,6 +1,6 @@
 /**
  * Auth Helpers — Server-side role enforcement
- * Use requireRole() in every admin API route.
+ * Import requireAdmin or requireRole in every admin API route.
  */
 
 import { auth } from "@/lib/auth";
@@ -39,6 +39,19 @@ export async function requireRole(
 }
 
 /**
+ * Backward-compatible admin auth check.
+ * Returns { userId, userName, role } or null (does NOT throw).
+ * Use this in admin API routes that check `if (!admin) return 403`.
+ */
+export async function requireAdmin(): Promise<AdminSession | null> {
+    try {
+        return await requireRole(["admin", "editor"]);
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Try to get admin session. Returns null if not authenticated.
  * Does NOT throw — use for optional auth checks.
  */
@@ -49,3 +62,4 @@ export async function getAdminSession(): Promise<AdminSession | null> {
         return null;
     }
 }
+

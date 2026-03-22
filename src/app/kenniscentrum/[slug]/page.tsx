@@ -11,6 +11,7 @@ import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArticleCTA } from "@/components/article-cta";
 
 interface PageProps {
     params: Promise<{ slug: string }>;
@@ -282,18 +283,8 @@ export default async function ArticlePage({ params }: PageProps) {
                         </div>
                     )}
 
-                    {/* CTA */}
-                    <div style={{ marginTop: 48, padding: 32, background: "linear-gradient(135deg, #16324F, #1a3a5c)", borderRadius: 16, textAlign: "center" }}>
-                        <h3 style={{ color: "white", fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
-                            Klaar om dakkapel offertes te vergelijken?
-                        </h3>
-                        <p style={{ color: "rgba(255,255,255,0.7)", marginBottom: 20, fontSize: 15 }}>
-                            Ontvang binnen 48 uur tot 4 vrijblijvende offertes. 100% gratis.
-                        </p>
-                        <Link href="/#offerte" style={{ display: "inline-block", padding: "14px 28px", background: "#F59E0B", color: "#1E293B", borderRadius: 12, fontWeight: 700, fontSize: 16, textDecoration: "none" }}>
-                            Nu gratis offertes vergelijken →
-                        </Link>
-                    </div>
+                    {/* Embedded Lead Form */}
+                    <ArticleCTA />
                 </main>
 
                 {/* Footer */}

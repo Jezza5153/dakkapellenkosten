@@ -6,18 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, and, lt } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user) return null;
-    const role = (session.user as any).role;
-    if (role !== "admin" && role !== "editor") return null;
-    return {
-        userId: (session.user as any).id || session.user.id,
-        userName: (session.user as any).name || session.user.email || "Onbekend",
-    };
-}
 
 // GET — check if content is locked
 export async function GET(request: NextRequest) {

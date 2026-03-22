@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import "@/lib/env"; // Fail-fast env validation
 import "./globals.css";
+import { AnalyticsLoader } from "@/components/analytics";
 
 export const metadata: Metadata = {
     title: {
@@ -19,6 +21,7 @@ export default function RootLayout({
         <html lang="nl">
             <body className="antialiased">
                 {children}
+                <AnalyticsLoader />
             </body>
         </html>
     );

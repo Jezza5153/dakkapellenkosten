@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireRole } from "@/lib/admin/auth";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { addCredits } from "@/lib/credits";
@@ -21,16 +21,10 @@ const adjustSchema = z.object({
 
 export async function POST(request: NextRequest) {
     try {
-        const session = await auth();
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
-        }
-
-        const user = await db.query.users.findFirst({
-            where: eq(schema.users.id, session.user.id),
-        });
-
-        if (!user || user.role !== "admin") {
+        let admin;
+        try {
+            admin = await requireRole(["admin"]);
+        } catch {
             return NextResponse.json({ error: "Toegang geweigerd" }, { status: 403 });
         }
 
@@ -53,14 +47,14 @@ export async function POST(request: NextRequest) {
             companyId,
             amount: Math.abs(amount),
             description: `[Admin] ${description}`,
-            adminUserId: session.user.id,
+            adminUserId: admin.userId,
             type,
         });
 
         // Audit log
         await logAudit({
-            actorId: session.user.id,
-            actorName: user.name,
+            actorId: admin.userId,
+            actorName: admin.userName,
             action: type === "refund" ? "refund" : "adjustment",
             entityType: "credits",
             entityId: companyId,

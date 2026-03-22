@@ -11,6 +11,7 @@ import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { GeoCTA } from "@/components/geo-cta";
 
 interface PageProps {
     params: Promise<{ slug: string }>;
@@ -176,18 +177,8 @@ export default async function GeoPage({ params }: PageProps) {
                     )}
                 </section>
 
-                {/* CTA */}
-                <section style={{ background: "linear-gradient(135deg, #16324F, #1a3a5c)", padding: "60px 24px", textAlign: "center" }}>
-                    <h2 style={{ fontSize: 28, fontWeight: 800, color: "white", marginBottom: 12 }}>
-                        Klaar om dakkapel offertes te vergelijken{page.city ? ` in ${page.city}` : ""}?
-                    </h2>
-                    <p style={{ color: "rgba(255,255,255,0.7)", marginBottom: 24, fontSize: 16 }}>
-                        Ontvang binnen 48 uur tot 4 vrijblijvende offertes. 100% gratis.
-                    </p>
-                    <Link href="/#offerte" style={{ display: "inline-block", padding: "16px 36px", background: "#F59E0B", color: "#1E293B", borderRadius: 12, fontWeight: 700, fontSize: 18, textDecoration: "none" }}>
-                        Nu gratis offertes vergelijken →
-                    </Link>
-                </section>
+                {/* Embedded Lead Form */}
+                <GeoCTA city={page.city} />
 
                 {/* Footer */}
                 <footer style={{ background: "#16324F", padding: "32px 24px", textAlign: "center" }}>

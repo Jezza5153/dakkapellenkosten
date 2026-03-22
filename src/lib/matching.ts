@@ -13,7 +13,7 @@
  */
 
 import { db, schema } from "@/db";
-import { eq, and, gte, ne, sql } from "drizzle-orm";
+import { eq, and, gte, isNull } from "drizzle-orm";
 import { MAX_COMPANIES_PER_LEAD, LEAD_CREDIT_COST } from "./stripe";
 
 interface MatchResult {
@@ -34,10 +34,11 @@ export async function matchLeadToCompanies(leadId: string): Promise<MatchResult[
 
     if (!lead) throw new Error(`Lead ${leadId} not found`);
 
-    // Find all companies with active subscriptions and sufficient credits
+    // Find all non-deleted, verified companies with their subscription/credit info
     const companies = await db.query.companies.findMany({
         where: and(
-            eq(schema.companies.deletedAt, sql`NULL`),
+            isNull(schema.companies.deletedAt),
+            eq(schema.companies.isVerified, true),
         ),
         with: {
             subscription: true,

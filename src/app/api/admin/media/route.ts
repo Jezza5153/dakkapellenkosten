@@ -5,34 +5,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { desc, sql } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { logAudit } from "@/lib/admin/audit";
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user) return null;
-    const role = (session.user as any).role;
-    if (role !== "admin" && role !== "editor") return null;
-    return {
-        userId: (session.user as any).id || session.user.id,
-        userName: (session.user as any).name || session.user.email || "Onbekend",
-    };
-}
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     const authResult = await requireAdmin();
     if (!authResult) {
         return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50")));
+    const offset = (page - 1) * limit;
+
+    const [countResult] = await db.select({ total: sql<number>`count(*)` })
+        .from(schema.media)
+        .where(sql`${schema.media.deletedAt} IS NULL`);
+
     const media = await db.query.media.findMany({
         where: sql`${schema.media.deletedAt} IS NULL`,
         orderBy: [desc(schema.media.createdAt)],
+        limit,
+        offset,
     });
 
-    return NextResponse.json({ media });
+    return NextResponse.json({
+        media,
+        pagination: {
+            page,
+            limit,
+            total: Number(countResult.total),
+            totalPages: Math.ceil(Number(countResult.total) / limit),
+        },
+    });
 }
 
 export async function POST(request: NextRequest) {

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, asc } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { z } from "zod";
 import { logAudit } from "@/lib/admin/audit";
 
@@ -16,16 +16,6 @@ const createTaskSchema = z.object({
     assignedTo: z.string().nullable().optional(),
 });
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user) return null;
-    const role = (session.user as any).role;
-    if (role !== "admin") return null;
-    return {
-        userId: (session.user as any).id || session.user.id,
-        userName: (session.user as any).name || session.user.email || "Onbekend",
-    };
-}
 
 // GET — list tasks for a lead
 export async function GET(

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, inArray } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { z } from "zod";
 import { logAudit } from "@/lib/admin/audit";
 
@@ -17,13 +17,13 @@ const bulkSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-    const session = await auth();
-    if (!session?.user || (session.user as any).role !== "admin") {
+    const authResult = await requireAdmin();
+    if (!authResult) {
         return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
     }
 
-    const userId = (session.user as any).id || session.user.id;
-    const userName = (session.user as any).name || session.user.email || "Onbekend";
+    const userId = authResult.userId;
+    const userName = authResult.userName;
 
     const body = await request.json();
     const parsed = bulkSchema.safeParse(body);

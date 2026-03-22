@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, desc, asc, ilike, and, sql } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { z } from "zod";
 import { logAudit } from "@/lib/admin/audit";
 
@@ -25,22 +25,11 @@ const createArticleSchema = z.object({
     scheduledAt: z.string().optional(),
 });
 
-async function requireAdmin(request?: NextRequest) {
-    const session = await auth();
-    if (!session?.user) {
-        return { error: "Niet ingelogd", status: 401 };
-    }
-    const role = (session.user as any).role;
-    if (role !== "admin" && role !== "editor") {
-        return { error: "Geen toegang", status: 403 };
-    }
-    return { session, userId: (session.user as any).id || session.user.id, userName: (session.user as any).name || session.user.email || "Onbekend" };
-}
 
 export async function GET(request: NextRequest) {
     const authResult = await requireAdmin();
-    if ("error" in authResult) {
-        return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    if (!authResult) {
+        return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -101,8 +90,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     const authResult = await requireAdmin();
-    if ("error" in authResult) {
-        return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    if (!authResult) {
+        return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
     }
 
     const body = await request.json();

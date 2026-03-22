@@ -10,6 +10,7 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { sendLeadConfirmation, sendNewLeadNotification } from "@/lib/email";
 import { matchLeadToCompanies } from "@/lib/matching";
+import { geocodePostcode } from "@/lib/geocoding";
 
 const leadSchema = z.object({
     dakkapelType: z.enum(["prefab", "traditioneel", "weet_niet"]),
@@ -24,6 +25,10 @@ const leadSchema = z.object({
     budgetMax: z.number().optional(),
     timeline: z.enum(["zo_snel_mogelijk", "1_3_maanden", "3_6_maanden", "6_plus_maanden", "weet_niet"]).optional(),
     extraNotes: z.string().max(1000).optional(),
+    // UTM attribution
+    utmSource: z.string().max(200).optional(),
+    utmMedium: z.string().max(200).optional(),
+    utmCampaign: z.string().max(200).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -93,8 +98,30 @@ export async function POST(request: NextRequest) {
             extraNotes: data.extraNotes || null,
             ipAddress,
             userAgent,
+            utmSource: data.utmSource || null,
+            utmMedium: data.utmMedium || null,
+            utmCampaign: data.utmCampaign || null,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         }).returning();
+
+        // --- Geocode postcode → lat/lng for distance matching ---
+        try {
+            const geo = await geocodePostcode(data.postcode);
+            if (geo) {
+                await db.update(schema.leads).set({
+                    latitude: String(geo.latitude),
+                    longitude: String(geo.longitude),
+                    city: geo.city || data.city || null,
+                }).where(eq(schema.leads.id, lead.id));
+                // Update in-memory lead object for matching
+                (lead as any).latitude = String(geo.latitude);
+                (lead as any).longitude = String(geo.longitude);
+                if (geo.city) (lead as any).city = geo.city;
+            }
+        } catch (geoErr) {
+            console.error("[lead] Geocoding failed (non-blocking):", geoErr);
+            // Lead creation continues without coordinates — matching falls back to capability-only
+        }
 
         // --- Send confirmation to homeowner ---
         await sendLeadConfirmation({
@@ -149,6 +176,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             message: "Je aanvraag is ontvangen! Je ontvangt binnen 48 uur reactie.",
+            referenceId: publicToken.substring(0, 8).toUpperCase(),
         }, { status: 201 });
 
     } catch (error) {

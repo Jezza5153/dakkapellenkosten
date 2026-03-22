@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, and, ne } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { z } from "zod";
 import { logAudit, computeDiff } from "@/lib/admin/audit";
 import { createRevision } from "@/lib/admin/revisions";
@@ -26,29 +26,14 @@ const updateArticleSchema = z.object({
     scheduledAt: z.string().nullable().optional(),
 });
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user) {
-        return { error: "Niet ingelogd", status: 401 };
-    }
-    const role = (session.user as any).role;
-    if (role !== "admin" && role !== "editor") {
-        return { error: "Geen toegang", status: 403 };
-    }
-    return {
-        session,
-        userId: (session.user as any).id || session.user.id,
-        userName: (session.user as any).name || session.user.email || "Onbekend",
-    };
-}
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     const authResult = await requireAdmin();
-    if ("error" in authResult) {
-        return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    if (!authResult) {
+        return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -70,8 +55,8 @@ async function handleUpdate(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const authResult = await requireAdmin();
-    if ("error" in authResult) {
-        return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    if (!authResult) {
+        return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -187,8 +172,8 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const authResult = await requireAdmin();
-    if ("error" in authResult) {
-        return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    if (!authResult) {
+        return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
     }
 
     const { id } = await params;

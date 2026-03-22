@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq, and, ne } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { z } from "zod";
 import { logAudit, computeDiff } from "@/lib/admin/audit";
 import { createRevision } from "@/lib/admin/revisions";
@@ -26,16 +26,6 @@ const updatePageSchema = z.object({
     status: z.enum(["draft", "published", "scheduled"]).optional(),
 });
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user) return null;
-    const role = (session.user as any).role;
-    if (role !== "admin" && role !== "editor") return null;
-    return {
-        userId: (session.user as any).id || session.user.id,
-        userName: (session.user as any).name || session.user.email || "Onbekend",
-    };
-}
 
 export async function GET(
     request: NextRequest,

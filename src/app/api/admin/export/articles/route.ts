@@ -7,20 +7,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { desc, sql, eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { logAudit } from "@/lib/admin/audit";
 import { exportLimiter } from "@/lib/admin/rate-limit";
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user) return null;
-    const role = (session.user as any).role;
-    if (role !== "admin") return null;
-    return {
-        userId: (session.user as any).id || session.user.id,
-        userName: (session.user as any).name || session.user.email || "Onbekend",
-    };
-}
 
 function escapeCsv(value: string | null | undefined): string {
     if (!value) return "";

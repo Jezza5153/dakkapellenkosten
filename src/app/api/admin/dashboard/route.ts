@@ -4,21 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { db, schema } from "@/db";
 import { eq, desc, count, sql, and, gte } from "drizzle-orm";
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user?.id) return null;
-
-    const user = await db.query.users.findFirst({
-        where: eq(schema.users.id, session.user.id),
-    });
-
-    if (!user || user.role !== "admin") return null;
-    return user;
-}
 
 export async function GET() {
     try {

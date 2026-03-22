@@ -4,21 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { logAudit } from "@/lib/admin/audit";
 
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user?.id) return null;
-    const user = await db.query.users.findFirst({
-        where: eq(schema.users.id, session.user.id),
-    });
-    if (!user || user.role !== "admin") return null;
-    return { userId: user.id, userName: user.name || user.email || "Onbekend" };
-}
 
 // GET — Full company detail with matches
 export async function GET(
@@ -58,7 +49,7 @@ const patchSchema = z.object({
     isPublic: z.boolean().optional(),
     description: z.string().optional(),
     serviceRadiusKm: z.number().optional(),
-}).passthrough();
+}).strict();
 
 export async function PATCH(
     request: NextRequest,

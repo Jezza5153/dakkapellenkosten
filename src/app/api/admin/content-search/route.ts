@@ -6,15 +6,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { ilike, eq, or, desc, sql, and } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin/auth";
 
 export async function GET(request: NextRequest) {
-    const session = await auth();
-    if (!session?.user) {
-        return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
-    }
-    const role = (session.user as any).role;
-    if (role !== "admin" && role !== "editor") {
+    const authResult = await requireAdmin();
+    if (!authResult) {
         return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
     }
 

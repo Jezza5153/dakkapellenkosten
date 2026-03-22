@@ -51,7 +51,9 @@ export async function addCredits({
         .update(schema.creditBalances)
         .set({
             balance: sql`${schema.creditBalances.balance} + ${amount}`,
-            totalPurchased: sql`${schema.creditBalances.totalPurchased} + ${amount}`,
+            ...(type === "purchase"
+                ? { totalPurchased: sql`${schema.creditBalances.totalPurchased} + ${amount}` }
+                : {}),
             updatedAt: new Date(),
         })
         .where(eq(schema.creditBalances.companyId, companyId))

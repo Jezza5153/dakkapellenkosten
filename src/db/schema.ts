@@ -222,6 +222,11 @@ export const leads = pgTable("leads", {
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: text("user_agent"),
 
+    // Attribution
+    utmSource: varchar("utm_source", { length: 200 }),
+    utmMedium: varchar("utm_medium", { length: 200 }),
+    utmCampaign: varchar("utm_campaign", { length: 200 }),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     expiresAt: timestamp("expires_at"),

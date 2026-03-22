@@ -4,83 +4,11 @@
  */
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { analytics } from "@/components/analytics";
+import { LeadForm } from "@/components/lead-form";
 import "./home.css";
-
-/* ————————————————————————————————————————————
-   Lead Form Component
-———————————————————————————————————————————— */
-function LeadForm() {
-    const [form, setForm] = useState({
-        dakkapelType: "", breedte: "", postcode: "",
-        naam: "", email: "", telefoon: "",
-    });
-    const [submitting, setSubmitting] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
-    const [error, setError] = useState("");
-
-    function update(field: string, value: string) {
-        setForm(prev => ({ ...prev, [field]: value }));
-    }
-
-    async function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        setSubmitting(true);
-        setError("");
-        try {
-            const res = await fetch("/api/leads", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
-            });
-            if (res.ok) {
-                setSubmitted(true);
-                setTimeout(() => { setSubmitted(false); setForm({ dakkapelType: "", breedte: "", postcode: "", naam: "", email: "", telefoon: "" }); }, 4000);
-            } else {
-                const data = await res.json();
-                setError(data.error || "Er ging iets mis. Probeer het opnieuw.");
-            }
-        } catch {
-            setError("Er ging iets mis. Probeer het opnieuw.");
-        }
-        setSubmitting(false);
-    }
-
-    return (
-        <div className="lead-form-card">
-            <h3 className="lead-form-title">Ontvang gratis dakkapel offertes</h3>
-            <p className="lead-form-sub">Vul je gegevens in en ontvang binnen 48 uur tot 4 vrijblijvende offertes.</p>
-            <form onSubmit={handleSubmit} className="lead-form">
-                <div className="form-row">
-                    <select required value={form.dakkapelType} onChange={e => update("dakkapelType", e.target.value)} className="form-input">
-                        <option value="">Type dakkapel</option>
-                        <option value="prefab">Prefab</option>
-                        <option value="traditioneel">Traditioneel</option>
-                        <option value="weet_niet">Weet ik nog niet</option>
-                    </select>
-                    <select required value={form.breedte} onChange={e => update("breedte", e.target.value)} className="form-input">
-                        <option value="">Gewenste breedte</option>
-                        <option value="2m">Tot 2 meter</option>
-                        <option value="3m">±3 meter</option>
-                        <option value="4m">±4 meter</option>
-                        <option value="5m_plus">5 meter+</option>
-                        <option value="weet_niet">Weet ik nog niet</option>
-                    </select>
-                </div>
-                <input required type="text" placeholder="Postcode" maxLength={7} value={form.postcode} onChange={e => update("postcode", e.target.value)} className="form-input" />
-                <input required type="text" placeholder="Naam" value={form.naam} onChange={e => update("naam", e.target.value)} className="form-input" />
-                <input required type="email" placeholder="E-mailadres" value={form.email} onChange={e => update("email", e.target.value)} className="form-input" />
-                <input required type="tel" placeholder="Telefoonnummer" value={form.telefoon} onChange={e => update("telefoon", e.target.value)} className="form-input" />
-                <button type="submit" disabled={submitting} className={`form-submit ${submitted ? "form-submit--success" : ""}`}>
-                    {submitted ? "✓ Aanvraag verzonden!" : submitting ? "Verzenden..." : "Nu gratis offertes vergelijken →"}
-                </button>
-                {error && <p className="form-error">{error}</p>}
-                <p className="form-trust">🔒 Je gegevens zijn veilig en worden niet gedeeld met derden.</p>
-            </form>
-        </div>
-    );
-}
 
 /* ————————————————————————————————————————————
    FAQ Component
@@ -118,6 +46,21 @@ function FAQ() {
    Main Homepage Component
 ———————————————————————————————————————————— */
 export default function HomeClient() {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [showStickyCta, setShowStickyCta] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setShowStickyCta(window.scrollY > 600);
+        };
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    useEffect(() => {
+        analytics.formView();
+    }, []);
+
     return (
         <div className="home">
             {/* Header */}
@@ -133,11 +76,27 @@ export default function HomeClient() {
                         <a href="#faq" className="nav-link">FAQ</a>
                         <a href="#offerte" className="nav-cta">Gratis offertes →</a>
                     </nav>
+                    <button
+                        className="mobile-menu-toggle"
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        aria-label="Menu"
+                    >
+                        {mobileMenuOpen ? "✕" : "☰"}
+                    </button>
                 </div>
+                {mobileMenuOpen && (
+                    <nav className="mobile-nav" onClick={() => setMobileMenuOpen(false)}>
+                        <a href="#offerte" className="mobile-nav-link mobile-nav-cta">Gratis offertes →</a>
+                        <a href="#kosten" className="mobile-nav-link">Kosten</a>
+                        <a href="#hoe-werkt-het" className="mobile-nav-link">Hoe werkt het</a>
+                        <Link href="/kenniscentrum" className="mobile-nav-link">Kenniscentrum</Link>
+                        <a href="#faq" className="mobile-nav-link">FAQ</a>
+                    </nav>
+                )}
             </header>
 
             {/* Hero */}
-            <section id="offerte" className="hero">
+            <section className="hero">
                 <div className="hero-bg-orb" />
                 <div className="hero-inner">
                     <div className="hero-content fade-in">
@@ -234,7 +193,7 @@ export default function HomeClient() {
                         ))}
                     </div>
                     <div className="section-cta">
-                        <a href="#offerte" className="btn btn--primary">Bereken jouw dakkapel kosten →</a>
+                        <a href="#offerte" className="btn btn--primary">Vergelijk offertes voor jouw dakkapel →</a>
                     </div>
                 </div>
             </section>
@@ -293,6 +252,11 @@ export default function HomeClient() {
                     <p>© {new Date().getFullYear()} DakkapellenKosten.nl — Alle rechten voorbehouden</p>
                 </div>
             </footer>
+
+            {/* Sticky Mobile CTA */}
+            <div className={`sticky-cta ${showStickyCta ? "sticky-cta--visible" : ""}`}>
+                <a href="#offerte" className="sticky-cta-btn">Gratis offertes vergelijken →</a>
+            </div>
         </div>
     );
 }

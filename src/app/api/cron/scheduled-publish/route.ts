@@ -1,12 +1,18 @@
 /**
- * Cron: Scheduled Publish — POST /api/cron/scheduled-publish
- * Publishes articles with scheduledAt in the past.
- * Secured with CRON_SECRET.
+ * Cron: Scheduled Publish + Lead Expiry + Lock Cleanup
+ * POST /api/cron/scheduled-publish
+ * 
+ * Runs every 5 minutes. Handles:
+ * 1. Publishing articles with scheduledAt in the past
+ * 2. Expiring leads past their expiresAt
+ * 3. Cleaning up expired content locks
+ * 
+ * Secured with CRON_SECRET (Bearer auth) + rate limiter.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { sql, lt, eq, and, isNotNull } from "drizzle-orm";
+import { sql, lt, lte, eq, and, isNotNull, isNull } from "drizzle-orm";
 import { logAudit } from "@/lib/admin/audit";
 import { cronLimiter } from "@/lib/admin/rate-limit";
 
@@ -25,13 +31,13 @@ export async function POST(request: NextRequest) {
     try {
         const now = new Date();
 
-        // Find articles that should be published
+        // === 1. Scheduled Publishing ===
         const candidates = await db.query.articles.findMany({
             where: and(
                 eq(schema.articles.status, "scheduled"),
                 isNotNull(schema.articles.scheduledAt),
                 lt(schema.articles.scheduledAt, now),
-                sql`${schema.articles.deletedAt} IS NULL`
+                isNull(schema.articles.deletedAt),
             ),
         });
 
@@ -60,13 +66,47 @@ export async function POST(request: NextRequest) {
             });
         }
 
+        // === 2. Lead Expiry ===
+        const expiredLeads = await db
+            .update(schema.leads)
+            .set({
+                status: "expired",
+                updatedAt: now,
+            })
+            .where(and(
+                isNotNull(schema.leads.expiresAt),
+                lte(schema.leads.expiresAt, now),
+                sql`${schema.leads.status} NOT IN ('fulfilled', 'cancelled', 'expired')`,
+            ))
+            .returning({ id: schema.leads.id, naam: schema.leads.naam, status: schema.leads.status });
+
+        for (const lead of expiredLeads) {
+            await logAudit({
+                actorName: "Cron",
+                action: "status_change",
+                entityType: "lead",
+                entityId: lead.id,
+                entityTitle: lead.naam,
+                diff: { status: { old: lead.status, new: "expired" } },
+            });
+        }
+
+        // === 3. Content Lock Cleanup ===
+        const expiredLocks = await db.delete(schema.contentLocks)
+            .where(lt(schema.contentLocks.expiresAt, now))
+            .returning({ id: schema.contentLocks.id });
+
         return NextResponse.json({
             success: true,
             published: published.length,
             titles: published,
+            expiredLeads: expiredLeads.length,
+            cleanedLocks: expiredLocks.length,
+            timestamp: now.toISOString(),
         });
     } catch (error) {
         console.error("[cron/scheduled-publish] Error:", error);
-        return NextResponse.json({ error: "Publish failed" }, { status: 500 });
+        return NextResponse.json({ error: "Cron job failed" }, { status: 500 });
     }
 }
+
